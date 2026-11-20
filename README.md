@@ -5,6 +5,25 @@
 
 See the tabs that are open in **every VS Code window on your PC** and edit them from your phone, over your home or office Wi-Fi. Nothing goes through the internet. Notes look like Obsidian, you can type on the PC and the phone at the same time, and you can see who changed every line.
 
+## Screenshots
+
+### On the phone
+
+| Your open notes | Live Preview | Editing | Who changed what |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/images/phone-notes.png" width="200" alt="Notes open in VS Code, listed on the phone with previews"> | <img src="docs/images/phone-note.png" width="200" alt="A note in Live Preview: properties, callout, checkboxes and a table"> | <img src="docs/images/phone-editing.png" width="200" alt="Editing a task list with the formatting bar above the keyboard"> | <img src="docs/images/phone-blame.png" width="200" alt="Blame view: who last changed each line, latest edits, and line details"> |
+| Every Markdown file open in any VS Code window | Obsidian-style rendering | Formatting bar; violet = this phone, blue = PC | Git blame plus this session's edits |
+
+### On the PC
+
+![VS Code showing lines edited on the phone with a violet bar and the phone's cursor labelled "iPhone is here"](docs/images/vscode.png)
+
+Lines edited on the phone get a violet bar in VS Code (hover over one for the device and time), and the phone's cursor is shown as **◂ iPhone is here**.
+
+<img src="docs/images/vscode-qr.png" width="300" alt="The Pocket Tabs QR code panel in VS Code">
+
+Click the phone icon in the status bar to get the QR code, then scan it to connect.
+
 ## Install
 
 1. Download `pocket-tabs-<version>.vsix` from the [latest release](https://github.com/HokageZ/pocket-tabs/releases/latest).

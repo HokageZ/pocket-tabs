@@ -8,3 +8,4 @@ node_modules/qrcode-generator/qrcode_UTF8.js
 web/**
 build.mjs
 .github/**
+docs/**
