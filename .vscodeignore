@@ -1,0 +1,10 @@
+test/**
+*.vsix
+.gitignore
+node_modules/qrcode-generator/sample.*
+node_modules/qrcode-generator/test/**
+node_modules/qrcode-generator/qrcode_SJIS.js
+node_modules/qrcode-generator/qrcode_UTF8.js
+web/**
+build.mjs
+.github/**

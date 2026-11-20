@@ -1,0 +1,4 @@
+node_modules/
+*.vsix
+# built by `npm run build` (and automatically when packaging)
+media/editor.js
