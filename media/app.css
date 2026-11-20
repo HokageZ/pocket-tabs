@@ -436,7 +436,7 @@ body.kb .note-bar { padding-top: 4px; }
 #note .cm-scroller { font-family: var(--font); line-height: 1.65; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 #note .cm-content { padding: 10px 0 45vh; caret-color: var(--accent); }
 #note .cm-line { padding: 0 20px; }
-#note.readable .cm-content { max-width: var(--readable); margin: 0 auto; width: 100%; }
+#note.readable .cm-content { flex: 1 1 auto; min-width: 0; max-width: var(--readable); margin: 0 auto; }
 #note .cm-cursor { border-left: 2px solid var(--accent); }
 #note .cm-selectionBackground, #note .cm-content ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent) !important; }
 #note .cm-gutters { background: var(--bg); border-right: 0; color: var(--faint); font-family: var(--mono); font-size: 0.78em; }
@@ -449,11 +449,12 @@ body.kb .note-bar { padding-top: 4px; }
 #note .cm-bm.is-fresh { opacity: 1; }
 #note .cm-blame-full .cm-gutterElement { padding: 0; }
 #note .cm-blame-full .cm-bm {
-  width: auto;
-  min-width: 98px;
-  max-width: 98px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  width: 112px;
   margin: 0;
-  padding: 0.3em 6px 0 8px;
+  padding: 0.35em 6px 0 8px;
   border-radius: 0;
   background: none;
   border-left: 3px solid var(--bm);
@@ -462,11 +463,9 @@ body.kb .note-bar { padding-top: 4px; }
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-#note .cm-blame-full .cm-bm span { display: block; overflow: hidden; text-overflow: ellipsis; }
-#note .cm-blame-full .cm-bm-name { font-weight: 650; }
-#note .cm-blame-full .cm-bm-when { font-weight: 500; color: var(--faint); font-variant-numeric: tabular-nums; }
+#note .cm-blame-full .cm-bm-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+#note .cm-blame-full .cm-bm-when { flex: none; margin-left: auto; font-weight: 500; color: var(--faint); font-variant-numeric: tabular-nums; }
 #note .cm-blame-full .cm-bm-me .cm-bm-name, #note .cm-blame-full .cm-bm-phone .cm-bm-name, #note .cm-blame-full .cm-bm-pc .cm-bm-name { color: var(--text-2); }
 #note.blame-on .cm-line { padding-left: 12px; }
 
@@ -590,7 +589,7 @@ body.kb .note-bar { padding-top: 4px; }
 
 #note .cm-table-wrap { overflow-x: auto; margin: 6px 20px; -webkit-overflow-scrolling: touch; }
 #note .cm-table-wrap table { border-collapse: collapse; font-size: 0.92em; min-width: 60%; }
-#note .cm-table-wrap th, #note .cm-table-wrap td { border: 1px solid var(--border); padding: 7px 11px; vertical-align: top; }
+#note .cm-table-wrap th, #note .cm-table-wrap td { border: 1px solid var(--border); padding: 7px 11px; vertical-align: top; white-space: nowrap; }
 #note .cm-table-wrap th { background: var(--surface); font-weight: 650; }
 #note .cm-table-wrap code { font-family: var(--mono); font-size: 0.9em; background: var(--code-bg); border-radius: 4px; padding: 0.1em 0.3em; }
 #note .cm-table-wrap mark { background: var(--hl-bg); color: inherit; }
