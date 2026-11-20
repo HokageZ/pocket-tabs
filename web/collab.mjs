@@ -102,8 +102,9 @@ export const blameField = StateField.define({
       const doc = tr.startState.doc;
       const ctx = {
         lineOf: (p) => doc.lineAt(p).number - 1,
-        isLineStart: (p) => doc.lineAt(p).from === p,
-        isLineEnd: (p) => doc.lineAt(p).to === p,
+        lineFrom: (n) => doc.line(n + 1).from,
+        lineTo: (n) => doc.line(n + 1).to,
+        slice: (a, b) => doc.sliceString(a, b),
       };
       const changes = [];
       tr.changes.iterChanges((fromA, toA, _fb, _tb, ins) => changes.push([fromA, toA, ins.toString()]));

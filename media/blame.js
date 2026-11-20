@@ -13,52 +13,85 @@
     return a;
   }
 
+  const MAX_LCS = 1e6;
+
   /**
-   * Update `lines` for one replacement [from, to) -> ins, made to a document described by ctx:
-   * { lineOf(pos) -> 0-based line, isLineStart(pos), isLineEnd(pos) }.
-   * Returns a new array. Untouched lines keep their attribution, like `git blame`.
+   * Attribution for a region of lines that was rewritten: lines whose text is unchanged
+   * keep their author (matched like a line diff), everything else gets `meta`.
+   */
+  function region(oldMetas, oldTexts, newTexts, meta) {
+    const n = oldTexts.length;
+    const m = newTexts.length;
+    const out = new Array(m);
+    let p = 0;
+    while (p < n && p < m && oldTexts[p] === newTexts[p]) {
+      out[p] = oldMetas[p];
+      p++;
+    }
+    let s = 0;
+    while (s < n - p && s < m - p && oldTexts[n - 1 - s] === newTexts[m - 1 - s]) {
+      out[m - 1 - s] = oldMetas[n - 1 - s];
+      s++;
+    }
+    const a = n - p - s;
+    const b = m - p - s;
+    if (a > 0 && b > 0 && a * b <= MAX_LCS) {
+      // longest common subsequence of the remaining lines
+      const w = b + 1;
+      const dp = new Uint32Array((a + 1) * w);
+      for (let i = a - 1; i >= 0; i--) {
+        for (let j = b - 1; j >= 0; j--) {
+          dp[i * w + j] = oldTexts[p + i] === newTexts[p + j] ? dp[(i + 1) * w + j + 1] + 1 : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+        }
+      }
+      let i = 0;
+      let j = 0;
+      while (i < a && j < b) {
+        if (oldTexts[p + i] === newTexts[p + j]) {
+          out[p + j] = oldMetas[p + i];
+          i++;
+          j++;
+        } else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) i++;
+        else j++;
+      }
+    }
+    for (let j = 0; j < m; j++) if (!out[j]) out[j] = meta;
+    return out;
+  }
+
+  /**
+   * Update `lines` for one replacement [from, to) -> ins made to a document described by ctx:
+   * { lineOf(pos), lineFrom(n), lineTo(n), slice(a, b) } with 0-based line numbers.
+   * Returns a new array. Lines that end up with the same text keep their attribution.
    */
   function step(lines, ctx, from, to, ins, meta) {
     const sL = ctx.lineOf(from);
     const eL = ctx.lineOf(to);
-    const nl = ins.split('\n').length - 1;
-    let a;
-    let b;
-    let add;
-    if (ctx.isLineStart(from) && ctx.isLineStart(to) && (ins === '' || ins.endsWith('\n')) && (from !== to || ins !== '')) {
-      // whole lines inserted/removed between line boundaries
-      a = sL;
-      b = eL;
-      add = ins === '' ? 0 : nl;
-    } else if (from === to && ctx.isLineEnd(from) && ins.startsWith('\n')) {
-      // new lines appended after the end of a line
-      a = sL + 1;
-      b = sL + 1;
-      add = nl;
-    } else if (ins === '' && eL > sL && ctx.isLineEnd(from) && ctx.isLineEnd(to)) {
-      // whole lines removed from the end of a line
-      a = sL + 1;
-      b = eL + 1;
-      add = 0;
-    } else {
-      a = sL;
-      b = eL + 1;
-      add = nl + 1;
-    }
-    return lines.slice(0, a).concat(fill(meta, add), lines.slice(b));
+    const oldTexts = [];
+    for (let n = sL; n <= eL; n++) oldTexts.push(ctx.slice(ctx.lineFrom(n), ctx.lineTo(n)));
+    const newTexts = (ctx.slice(ctx.lineFrom(sL), from) + ins + ctx.slice(to, ctx.lineTo(eL))).split('\n');
+    const mid = region(lines.slice(sL, eL + 1), oldTexts, newTexts, meta);
+    return lines.slice(0, sL).concat(mid, lines.slice(eL + 1));
   }
 
   /** Context for a plain string (used on the PC side). */
   function stringCtx(text) {
+    const starts = [0];
+    for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) starts.push(i + 1);
     return {
       lineOf(pos) {
-        let n = 0;
-        let i = -1;
-        while ((i = text.indexOf('\n', i + 1)) !== -1 && i < pos) n++;
-        return n;
+        let lo = 0;
+        let hi = starts.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (starts[mid] <= pos) lo = mid;
+          else hi = mid - 1;
+        }
+        return lo;
       },
-      isLineStart: (pos) => pos === 0 || text.charCodeAt(pos - 1) === 10,
-      isLineEnd: (pos) => pos >= text.length || text.charCodeAt(pos) === 10,
+      lineFrom: (n) => starts[n],
+      lineTo: (n) => (n + 1 < starts.length ? starts[n + 1] - 1 : text.length),
+      slice: (a, b) => text.slice(a, b),
     };
   }
 
@@ -100,5 +133,5 @@
     return p.lines.map((i) => metas[i]);
   }
 
-  return { step, stringCtx, applySteps, lineCount, pack, unpack, fill };
+  return { step, region, stringCtx, applySteps, lineCount, pack, unpack, fill };
 });

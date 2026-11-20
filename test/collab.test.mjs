@@ -129,3 +129,18 @@ console.log(`ok - 300 random sessions converged (${total} edits applied on the P
   assert.deepStrictEqual(lines.map((m) => m.k), ['git:1', 'git:1', 'git:1']);
   console.log('ok - blame keeps untouched lines (like git blame)');
 }
+
+// blame: one big replacement (how VS Code applies a file reloaded from disk)
+// only marks the lines whose text really changed
+{
+  const before = 'a\n- [ ] one\n- [ ] two\nkeep\n\nlast\n';
+  const after = 'a\n- [x] one\n- [ ] two\nkeep\n\nnew line\nlast\n';
+  const old = { k: 'git:1', t: 1 };
+  const pc = { k: 'pc', t: 2 };
+  const from = before.indexOf('- [ ] one');
+  const to = before.indexOf('last');
+  const ins = after.slice(from, after.indexOf('last'));
+  const lines = Blame.step(Blame.fill(old, 7), Blame.stringCtx(before), from, to, ins, pc);
+  assert.deepStrictEqual(lines.map((m) => m.k), ['git:1', 'pc', 'git:1', 'git:1', 'git:1', 'pc', 'git:1', 'git:1']);
+  console.log('ok - a multi-line replacement only blames the lines that changed');
+}
