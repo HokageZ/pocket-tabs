@@ -2,7 +2,7 @@
   "name": "pocket-tabs",
   "displayName": "Pocket Tabs",
   "description": "See the tabs open in every VS Code window on this PC and edit them from your phone over the local network.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
