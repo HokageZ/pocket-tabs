@@ -188,6 +188,11 @@
     left: svg('<path d="m15 18-6-6 6-6"/>'),
     right: svg('<path d="m9 18 6-6-6-6"/>'),
     kbd: svg('<rect x="2.5" y="4" width="19" height="11" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M7 11.5h10M9 19l3 2 3-2"/>'),
+    x: svg('<path d="M6 6l12 12M18 6 6 18"/>', 16),
+    folder: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', 19),
+    folderOpen: svg('<path d="M3 17V7a2 2 0 0 1 2-2h4l2 2.5h6a2 2 0 0 1 2 2V11"/><path d="M3.3 19 6 11.5h15.5L19 19z"/>', 19),
+    chev: svg('<path d="m9 6 6 6-6 6"/>', 14),
+    refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>', 16),
   };
 
   // ---------- connection ----------
@@ -307,28 +312,189 @@
     const cls = ['tab-row', t.isPreview ? 'is-preview' : '', t.openable ? '' : 'is-disabled'].filter(Boolean).join(' ');
     const attrs = t.openable ? `data-id="${esc(inst.id)}" data-uri="${esc(t.uri)}"` : `data-kind="${esc(t.kind)}"`;
     const sub = t.openable ? dirOf(t.path) : kindLabel(t.kind);
-    return `<button type="button" class="${cls}" ${attrs}>
+    const row = `<button type="button" class="${cls}" ${attrs}>
       <span class="fbadge c-${color}">${esc(abbr)}</span>
       <span class="tmain"><span class="tlabel">${esc(t.label)}</span>${sub ? `<span class="tpath">${esc(sub)}</span>` : ''}</span>
       <span class="note-flags">${t.isActive ? '<span class="on-pc">Open</span>' : ''}${t.isPinned ? ICON.pin : ''}${t.isDirty ? '<span class="dirty-dot"></span>' : ''}</span></button>`;
+    const close = t.openable
+      ? `<button type="button" class="tab-x" data-close-id="${esc(inst.id)}" data-close-uri="${esc(t.uri)}" data-dirty="${t.isDirty ? '1' : ''}" aria-label="Close ${esc(t.label)} on the PC">${ICON.x}</button>`
+      : '';
+    return `<div class="tab-line">${row}${close}</div>`;
   }
 
-  function vaultHead(inst) {
+  function vaultHead(inst, refresh) {
     const folder = inst.folders && inst.folders[0] ? inst.folders[0] : inst.remote || '';
-    return `<div class="vault-head"><span class="vault-name">${esc(inst.name)}</span><span class="vault-path">${esc(folder)}</span>${inst.focused ? '<span class="vault-badge">On screen</span>' : ''}</div>`;
+    return `<div class="vault-head"><span class="vault-name">${esc(inst.name)}</span><span class="vault-path">${esc(folder)}</span>${inst.focused ? '<span class="vault-badge">On screen</span>' : ''}${
+      refresh ? `<button type="button" class="vault-refresh" data-refresh="${esc(inst.id)}" aria-label="Reload folders">${ICON.refresh}</button>` : ''
+    }</div>`;
+  }
+
+  // ---------- file browser ----------
+  const fsNodes = new Map(); // `${windowId}|${folderUri}` -> { entries, truncated } | { loading } | { error }
+  const fsExpanded = new Set(); // `${windowId}|${folderUri}`
+  const fsSearch = { q: '', seq: 0, results: null };
+  let fsSearchTimer = 0;
+  let fsBusy = null; // file being opened
+  const fsKey = (instId, dir) => instId + '|' + (dir || '');
+
+  function openTabMap(inst) {
+    const m = new Map();
+    for (const t of allTabs(inst)) if (t.openable && t.uri) m.set(t.uri, t);
+    return m;
+  }
+
+  function loadDir(instId, dir) {
+    const key = fsKey(instId, dir);
+    const node = fsNodes.get(key);
+    if (node && (node.loading || node.entries)) return;
+    fsNodes.set(key, { loading: true });
+    api('GET', '/api/i/' + instId + '/ls' + (dir ? '?dir=' + enc(dir) : ''))
+      .then((r) => fsNodes.set(key, { entries: r.entries, truncated: r.truncated }))
+      .catch((err) => fsNodes.set(key, { error: err.message }))
+      .finally(renderHome);
+  }
+
+  const fsNote = (text, depth, err) => `<div class="fs-note${err ? ' is-err' : ''}" style="--d:${depth}">${esc(text)}</div>`;
+
+  function fileRow(inst, name, uri, depth, open, sub) {
+    const [abbr, color] = badgeFor({ label: name, kind: 'text', openable: true });
+    const tab = open.get(uri);
+    const flags = (tab ? '<span class="open-chip">Open</span>' : '') + (tab && tab.isDirty ? '<span class="dirty-dot" title="Unsaved changes"></span>' : '');
+    return `<button type="button" class="fs-row fs-file${fsBusy === uri ? ' is-busy' : ''}" data-fs="file" data-id="${esc(inst.id)}" data-path="${esc(uri)}" style="--d:${depth}">
+      <span class="fs-chev"></span><span class="fbadge c-${color}">${esc(abbr)}</span>
+      <span class="fs-main"><span class="fs-name">${esc(name)}</span>${sub ? `<span class="fs-sub">${esc(sub)}</span>` : ''}</span>
+      <span class="note-flags">${flags}</span></button>`;
+  }
+
+  function renderDir(inst, dir, depth, open) {
+    const node = fsNodes.get(fsKey(inst.id, dir));
+    if (!node) {
+      loadDir(inst.id, dir);
+      return fsNote('Loading…', depth);
+    }
+    if (node.loading) return fsNote('Loading…', depth);
+    if (node.error) return fsNote(node.error, depth, true);
+    if (!node.entries.length) return fsNote('Empty folder', depth);
+    return node.entries.map((e) => renderEntry(inst, e, depth, open)).join('') + (node.truncated ? fsNote('Showing the first 3,000 items', depth) : '');
+  }
+
+  function renderEntry(inst, e, depth, open) {
+    if (e.type !== 'dir') return fileRow(inst, e.name, e.uri, depth, open, '');
+    const isOpen = fsExpanded.has(fsKey(inst.id, e.uri));
+    return `<button type="button" class="fs-row fs-dir${isOpen ? ' is-open' : ''}" data-fs="dir" data-id="${esc(inst.id)}" data-path="${esc(e.uri)}" style="--d:${depth}" aria-expanded="${isOpen}">
+      <span class="fs-chev">${ICON.chev}</span><span class="fs-ic">${isOpen ? ICON.folderOpen : ICON.folder}</span><span class="fs-name">${esc(e.name)}</span></button>` +
+      (isOpen ? renderDir(inst, e.uri, depth + 1, open) : '');
+  }
+
+  function renderFiles() {
+    const q = filterEl.value.trim();
+    if (q.length >= 2) return renderFileResults(q);
+    let html = '';
+    for (const inst of instances) {
+      const open = openTabMap(inst);
+      const root = fsNodes.get(fsKey(inst.id, ''));
+      if (!root) loadDir(inst.id, '');
+      let body;
+      if (!root || root.loading) body = fsNote('Loading…', 0);
+      else if (root.error) body = fsNote(root.error, 0, true);
+      else if (!root.entries.length) body = fsNote('No folder is open in this window', 0);
+      else if (root.entries.length === 1) {
+        fsExpanded.add(fsKey(inst.id, root.entries[0].uri)); // one folder: show its contents directly
+        body = renderDir(inst, root.entries[0].uri, 0, open);
+      } else body = root.entries.map((e) => renderEntry(inst, e, 0, open)).join('');
+      html += `<section class="vault">${vaultHead(inst, true)}<div class="card fs-card">${body}</div></section>`;
+    }
+    return html;
+  }
+
+  function renderFileResults(q) {
+    if (fsSearch.q !== q) scheduleFileSearch(q);
+    if (!fsSearch.results) return '<div class="empty"><p>Searching…</p></div>';
+    let html = '';
+    for (const { inst, results, error } of fsSearch.results) {
+      if (!error && !results.length) continue;
+      const open = openTabMap(inst);
+      const body = error ? fsNote(error, 0, true) : results.map((r) => fileRow(inst, r.name, r.uri, 0, open, dirOf(r.path))).join('');
+      html += `<section class="vault">${vaultHead(inst)}<div class="card fs-card">${body}</div></section>`;
+    }
+    return html || `<div class="empty"><h2>No files found</h2><p>No file name in your open folders contains “${esc(q)}”.</p></div>`;
+  }
+
+  function scheduleFileSearch(q) {
+    fsSearch.q = q;
+    fsSearch.results = null;
+    const seq = ++fsSearch.seq;
+    clearTimeout(fsSearchTimer);
+    fsSearchTimer = setTimeout(async () => {
+      const out = await Promise.all(
+        instances.map((inst) =>
+          api('GET', '/api/i/' + inst.id + '/find?q=' + enc(q)).then(
+            (r) => ({ inst, results: r.results }),
+            (err) => ({ inst, results: [], error: err.message })
+          )
+        )
+      );
+      if (seq !== fsSearch.seq) return;
+      fsSearch.results = out;
+      renderHome();
+    }, 250);
+  }
+
+  /** Open a file from the phone: it becomes a real tab on the PC, then opens here. */
+  async function openFromPhone(instId, uri) {
+    const inst = instances.find((i) => i.id === instId);
+    if (inst && openTabMap(inst).has(uri)) {
+      navFromList = true;
+      location.hash = noteHash(instId, uri);
+      return;
+    }
+    if (fsBusy) return;
+    fsBusy = uri;
+    renderHome();
+    try {
+      const r = await api('POST', '/api/i/' + instId + '/openfile', { uri });
+      if (r.text) {
+        navFromList = true;
+        location.hash = noteHash(instId, r.uri);
+      } else {
+        toast("Opened on the PC. This kind of file can't be edited on the phone");
+      }
+    } catch (err) {
+      toast(err.message, 'err');
+    } finally {
+      fsBusy = null;
+      renderHome();
+    }
+  }
+
+  async function closeTabFromPhone(instId, uri, dirty) {
+    if (dirty) {
+      toast('Unsaved on the PC. Save it first, then close it', 'err');
+      return;
+    }
+    try {
+      await api('POST', '/api/i/' + instId + '/closetab', { uri });
+      toast('Closed on the PC');
+    } catch (err) {
+      toast(err.message, 'err');
+    }
   }
 
   function renderHome() {
     if (currentView !== 'home') return;
-    const seg = prefs.seg === 'all' ? 'all' : 'notes';
-    $('#home-title').textContent = seg === 'notes' ? 'Notes' : 'Open tabs';
-    filterEl.placeholder = seg === 'notes' ? 'Search open notes' : 'Search open tabs';
+    const seg = prefs.seg === 'all' || prefs.seg === 'files' ? prefs.seg : 'notes';
+    $('#home-title').textContent = { notes: 'Notes', all: 'Open tabs', files: 'Files' }[seg];
+    filterEl.placeholder = { notes: 'Search open notes', all: 'Search open tabs', files: 'Search files by name' }[seg];
     for (const b of document.querySelectorAll('#home .seg button')) b.setAttribute('aria-selected', String(b.dataset.seg === seg));
 
     if (!instances.length) {
       listEl.innerHTML = `<div class="empty">${svg('<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>', 44, ' stroke-width="1.6"')}
         <h2>${online ? 'No VS Code windows yet' : 'Connecting to your PC…'}</h2>
         <p>${online ? 'Open VS Code on your PC. Every window with Pocket Tabs shows up here.' : 'Make sure VS Code is open and your phone is on the same Wi-Fi as your PC.'}</p></div>`;
+      return;
+    }
+    if (seg === 'files') {
+      listEl.innerHTML = renderFiles();
       return;
     }
     const q = filterEl.value.trim().toLowerCase();
@@ -370,6 +536,30 @@
   listEl.addEventListener('click', (ev) => {
     const go = ev.target.closest('[data-goto-seg]');
     if (go) return setSeg(go.dataset.gotoSeg);
+    const fsEl = ev.target.closest('[data-fs]');
+    if (fsEl) {
+      const { id, path } = fsEl.dataset;
+      if (fsEl.dataset.fs === 'dir') {
+        const key = fsKey(id, path);
+        if (fsExpanded.has(key)) fsExpanded.delete(key);
+        else {
+          fsExpanded.add(key);
+          loadDir(id, path);
+        }
+        renderHome();
+      } else {
+        openFromPhone(id, path);
+      }
+      return;
+    }
+    const x = ev.target.closest('[data-close-uri]');
+    if (x) return closeTabFromPhone(x.dataset.closeId, x.dataset.closeUri, !!x.dataset.dirty);
+    const ref = ev.target.closest('[data-refresh]');
+    if (ref) {
+      for (const k of [...fsNodes.keys()]) if (k.startsWith(ref.dataset.refresh + '|')) fsNodes.delete(k);
+      renderHome();
+      return;
+    }
     const b = ev.target.closest('[data-uri],[data-kind]');
     if (!b) return;
     if (b.dataset.uri) {
@@ -381,6 +571,7 @@
   });
   filterEl.addEventListener('input', renderHome);
   function setSeg(seg) {
+    if (seg === 'files' && prefs.seg !== 'files') fsNodes.clear(); // fresh listings each time the view opens
     prefs.seg = seg;
     savePrefs();
     renderHome();
@@ -1109,6 +1300,23 @@
   }
   $('#font-dec').addEventListener('click', () => setFont(prefs.fontSize - 1));
   $('#font-inc').addEventListener('click', () => setFont(prefs.fontSize + 1));
+  $('#act-close').addEventListener('click', async () => {
+    closeSheet();
+    const e = ed;
+    if (!e || !e.loaded) return;
+    if (e.isDirty || e.client.hasUnsent()) {
+      if (!confirm('Save your changes and close this tab on the PC?')) return;
+      e.savePending = true;
+      await enqueue(e, () => doSync(e, true, true));
+    }
+    try {
+      await api('POST', apiBase(e) + '/closetab', { uri: e.uri });
+      toast('Closed on the PC');
+      goBack();
+    } catch (err) {
+      toast(err.message, 'err');
+    }
+  });
   $('#act-reveal').addEventListener('click', async () => {
     closeSheet();
     const e = ed;

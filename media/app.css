@@ -244,6 +244,49 @@ button:disabled { cursor: default; }
 .is-preview .tlabel { font-style: italic; }
 .tpath { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* "All tabs": close a tab on the PC */
+.tab-line { position: relative; display: flex; align-items: center; }
+.tab-line .tab-row { flex: 1; min-width: 0; }
+.tab-line + .tab-line::before { content: ""; position: absolute; top: 0; left: 56px; right: 0; border-top: 1px solid var(--border); }
+.tab-x { flex: none; width: 40px; height: 40px; margin-right: 6px; border-radius: 10px; display: grid; place-items: center; color: var(--faint); }
+.tab-x:active { background: var(--surface-2); color: var(--text); }
+
+/* ---------- files ---------- */
+.fs-card { padding: 4px 0; }
+.fs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 12px 5px calc(8px + var(--d, 0) * 18px);
+  text-align: left;
+}
+.fs-row:active { background: var(--surface-2); }
+.fs-row.is-busy { opacity: 0.5; }
+.fs-chev { flex: none; width: 16px; display: grid; place-items: center; color: var(--faint); transition: transform 0.15s; }
+.fs-row.is-open .fs-chev { transform: rotate(90deg); }
+.fs-ic { flex: none; width: 28px; display: grid; place-items: center; color: var(--muted); }
+.fs-row.is-open .fs-ic { color: var(--accent); }
+.fs-row .fbadge { width: 28px; height: 28px; border-radius: 8px; font-size: 9px; }
+.fs-main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.fs-name { min-width: 0; flex: 1; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-dir .fs-name { font-weight: 560; }
+.fs-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-note { padding: 10px 14px 10px calc(40px + var(--d, 0) * 18px); font-size: 13.5px; color: var(--muted); }
+.fs-note.is-err { color: var(--danger); }
+.open-chip {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.vault-refresh { flex: none; align-self: center; margin-left: auto; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--faint); }
+.vault-badge + .vault-refresh { margin-left: 6px; }
+.vault-refresh:active { background: var(--surface); color: var(--text); }
+
 .empty { text-align: center; padding: 64px 24px; color: var(--muted); }
 .empty svg { color: var(--faint); }
 .empty h2 { color: var(--text); font-size: 18px; margin: 14px 0 6px; letter-spacing: -0.01em; }
