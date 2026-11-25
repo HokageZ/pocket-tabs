@@ -89,7 +89,7 @@
   "scripts": {
     "build": "node build.mjs",
     "vscode:prepublish": "node build.mjs",
-    "test": "node test/sync.test.js && node test/collab.test.mjs",
+    "test": "node test/sync.test.js && node test/collab.test.mjs && node test/paths.test.js",
     "package": "npx --yes @vscode/vsce@3 package --no-dependencies"
   },
   "devDependencies": {
