@@ -9,10 +9,15 @@ See the tabs that are open in **every VS Code window on your PC** and edit them 
 
 ### On the phone
 
-| Your open notes | Live Preview | Editing | Who changed what |
-| :---: | :---: | :---: | :---: |
-| <img src="docs/images/phone-notes.png" width="200" alt="Notes open in VS Code, listed on the phone with previews"> | <img src="docs/images/phone-note.png" width="200" alt="A note in Live Preview: properties, callout, checkboxes and a table"> | <img src="docs/images/phone-editing.png" width="200" alt="Editing a task list with the formatting bar above the keyboard"> | <img src="docs/images/phone-blame.png" width="200" alt="Blame view: who last changed each line, latest edits, and line details"> |
-| Every Markdown file open in any VS Code window | Obsidian-style rendering | Formatting bar; violet = this phone, blue = PC | Git blame plus this session's edits |
+| Your open notes | Browse your folders | All tabs |
+| :---: | :---: | :---: |
+| <img src="docs/images/phone-notes.png" width="240" alt="Notes open in VS Code, listed on the phone with previews, and the Notes, All tabs and Files switcher"> | <img src="docs/images/phone-files.png" width="240" alt="The Files view: the window's folder as a tree with one folder expanded, and Open chips on files already open on the PC"> | <img src="docs/images/phone-tabs.png" width="240" alt="All tabs: notes and a Python file opened from the phone, each with a close button"> |
+| Every Markdown file open in any VS Code window | Tap a file to open it as a tab on the PC | Every tab, code too; × closes it on the PC |
+
+| Live Preview | Editing | Who changed what |
+| :---: | :---: | :---: |
+| <img src="docs/images/phone-note.png" width="240" alt="A note in Live Preview: properties, callout, checkboxes and a table"> | <img src="docs/images/phone-editing.png" width="240" alt="Editing a task list with the formatting bar above the keyboard"> | <img src="docs/images/phone-blame.png" width="240" alt="Blame view: who last changed each line, latest edits, and line details"> |
+| Obsidian-style rendering | Formatting bar; violet = this phone, blue = PC | Git blame plus this session's edits |
 
 ### On the PC
 
