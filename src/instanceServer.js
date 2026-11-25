@@ -32,6 +32,18 @@ function startInstanceServer({ bridge, store, log }) {
         case 'POST /collab/presence':
           out = await bridge.collabPresence(await readJson(req));
           break;
+        case 'GET /files/list':
+          out = await bridge.listFolder(q.get('dir'));
+          break;
+        case 'GET /files/find':
+          out = await bridge.findFiles(q.get('q'));
+          break;
+        case 'POST /files/open':
+          out = await bridge.openFile(await readJson(req));
+          break;
+        case 'POST /files/close':
+          out = await bridge.closeTab(await readJson(req));
+          break;
         case 'POST /reveal':
           out = await bridge.reveal(await readJson(req));
           break;

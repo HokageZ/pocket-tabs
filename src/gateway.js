@@ -39,6 +39,10 @@ const ACTIONS = {
   save: ['POST', '/collab/save'],
   presence: ['POST', '/collab/presence'],
   reveal: ['POST', '/reveal'],
+  ls: ['GET', '/files/list'],
+  find: ['GET', '/files/find'],
+  openfile: ['POST', '/files/open'],
+  closetab: ['POST', '/files/close'],
 };
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;

@@ -6,6 +6,10 @@ const os = require('os');
 const Blame = require('../media/blame.js');
 const { HttpError } = require('./httpUtil');
 const { Tracker, parseChangeSet, applyReplacements, positionAt, offsetOf, mapOffset, toLf } = require('./collab');
+const { isInside, relativeTo, excludeMatcher } = require('./paths');
+
+const MAX_LIST = 3000;
+const MAX_FIND = 100;
 
 const MAX_CHARS = 4 * 1024 * 1024;
 const MAX_ASSET_BYTES = 25 * 1024 * 1024;
@@ -509,13 +513,7 @@ class Bridge {
       candidates.push(vscode.Uri.joinPath(docDir, rel));
       for (const r of folders) candidates.push(vscode.Uri.joinPath(r, rel));
     }
-    const inside = (u) =>
-      roots.some((r) => {
-        if (u.scheme !== r.scheme || u.authority !== r.authority) return false;
-        const a = u.path.toLowerCase();
-        const b = r.path.toLowerCase().replace(/\/$/, '');
-        return a.startsWith(b + '/');
-      });
+    const inside = (u) => roots.some((r) => isInside(u, r, { allowEqual: false, caseInsensitive: this.caseInsensitive(r) }));
     const tryRead = async (u) => {
       if (!inside(u)) return null;
       try {
@@ -540,6 +538,131 @@ class Bridge {
       }
     }
     throw new HttpError(404, 'Image not found');
+  }
+
+  // ---------- file browser ----------
+
+  roots() {
+    return (vscode.workspace.workspaceFolders || []).map((f) => f.uri);
+  }
+
+  caseInsensitive(uri) {
+    return uri.scheme === 'file' && process.platform !== 'linux';
+  }
+
+  /** Parse a URI from the phone and make sure it is inside one of this window's folders. */
+  inWorkspace(uriStr) {
+    if (typeof uriStr !== 'string' || !uriStr) throw new HttpError(400, 'Missing path');
+    let uri;
+    try {
+      uri = vscode.Uri.parse(uriStr, true);
+    } catch {
+      throw new HttpError(400, 'Bad path');
+    }
+    const root = this.roots().find((r) => isInside(uri, r, { caseInsensitive: this.caseInsensitive(r) }));
+    if (!root) throw new HttpError(403, "That path is outside this window's folders.");
+    return { uri, root };
+  }
+
+  /** One folder level for the phone's file tree (no `dir`: the workspace folders themselves). */
+  async listFolder(dirStr) {
+    const roots = this.roots();
+    if (!dirStr) {
+      return {
+        dir: null,
+        entries: roots.map((r) => {
+          const f = vscode.workspace.getWorkspaceFolder(r);
+          return { name: f ? f.name : path.posix.basename(r.path), uri: r.toString(), type: 'dir', root: true };
+        }),
+      };
+    }
+    const { uri, root } = this.inWorkspace(dirStr);
+    let items;
+    try {
+      items = await vscode.workspace.fs.readDirectory(uri);
+    } catch {
+      throw new HttpError(404, 'Folder not found');
+    }
+    const ci = this.caseInsensitive(root);
+    const excluded = excludeMatcher(vscode.workspace.getConfiguration('files', root).get('exclude'), ci);
+    const base = relativeTo(uri, root, { caseInsensitive: ci }) || '';
+    const entries = [];
+    for (const [name, type] of items) {
+      const rel = base ? base + '/' + name : name;
+      if (excluded(rel)) continue;
+      const isDir = (type & vscode.FileType.Directory) !== 0;
+      entries.push({ name, uri: vscode.Uri.joinPath(uri, name).toString(), type: isDir ? 'dir' : 'file' });
+    }
+    entries.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }) : a.type === 'dir' ? -1 : 1));
+    return { dir: uri.toString(), path: base, entries: entries.slice(0, MAX_LIST), truncated: entries.length > MAX_LIST };
+  }
+
+  /** Files whose name contains `q`, across this window's folders (files.exclude and node_modules skipped). */
+  async findFiles(q) {
+    const query = String(q || '').replace(/[*?{}[\]\\/]/g, '').trim().slice(0, 80);
+    if (query.length < 2) return { results: [] };
+    const anyCase = query.split('').map((ch) => (/[a-z]/i.test(ch) ? `[${ch.toLowerCase()}${ch.toUpperCase()}]` : ch)).join('');
+    const multi = this.roots().length > 1;
+    const results = [];
+    for (const root of this.roots()) {
+      const patterns = Object.entries(vscode.workspace.getConfiguration('files', root).get('exclude') || {})
+        .filter(([, v]) => v === true)
+        .flatMap(([g]) => [g, g + '/**']);
+      const exclude = `{${['**/node_modules/**', '**/.git/**', ...patterns].join(',')}}`;
+      const found = await vscode.workspace.findFiles(new vscode.RelativePattern(root, `**/*${anyCase}*`), exclude, MAX_FIND);
+      for (const u of found) {
+        results.push({ name: path.posix.basename(u.path), uri: u.toString(), path: tildify(vscode.workspace.asRelativePath(u, multi)) });
+      }
+    }
+    const lq = query.toLowerCase();
+    results.sort((a, b) => {
+      const sa = a.name.toLowerCase().startsWith(lq) ? 0 : 1;
+      const sb = b.name.toLowerCase().startsWith(lq) ? 0 : 1;
+      return sa - sb || a.path.length - b.path.length || a.path.localeCompare(b.path);
+    });
+    return { results: results.slice(0, MAX_FIND) };
+  }
+
+  /** Open a workspace file as a real tab in this window (text files can then be edited from the phone). */
+  async openFile(body) {
+    const { uri } = this.inWorkspace(body && body.uri);
+    let st;
+    try {
+      st = await vscode.workspace.fs.stat(uri);
+    } catch {
+      throw new HttpError(404, 'File not found');
+    }
+    if (st.type & vscode.FileType.Directory) throw new HttpError(400, 'That is a folder');
+    let opened = uri;
+    let text = true;
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+      opened = doc.uri;
+    } catch {
+      text = false; // binary: let VS Code pick its viewer (image preview etc.)
+      await vscode.commands.executeCommand('vscode.open', uri, { preview: false, preserveFocus: true });
+    }
+    this.recomputeTabUris();
+    const key = opened.toString();
+    return { ok: true, uri: key, text: text && this.tabUris.has(key) };
+  }
+
+  /** Close a file's tab(s) in this window. Refuses unsaved files so VS Code never shows a prompt nobody sees. */
+  async closeTab(body) {
+    const uriStr = body && body.uri;
+    const tabs = [];
+    for (const g of vscode.window.tabGroups.all) {
+      for (const tab of g.tabs) {
+        const t = this.tabTarget(tab);
+        if ((t.kind === 'text' || t.kind === 'diff') && t.uri && t.uri.toString() === uriStr) tabs.push(tab);
+      }
+    }
+    if (!tabs.length) throw new HttpError(404, 'That file is not open in a tab on the PC anymore.', { code: 'tab-closed' });
+    if (tabs.some((t) => t.isDirty)) throw new HttpError(409, 'This file has unsaved changes. Save it first, then close it.', { code: 'dirty' });
+    await vscode.window.tabGroups.close(tabs, true);
+    this.recomputeTabUris();
+    return { ok: true };
   }
 
   /** Bring the tab to the front in this VS Code window. */
