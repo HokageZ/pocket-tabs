@@ -3,7 +3,7 @@
 [![Build and release](https://github.com/HokageZ/pocket-tabs/actions/workflows/release.yml/badge.svg)](https://github.com/HokageZ/pocket-tabs/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/HokageZ/pocket-tabs)](https://github.com/HokageZ/pocket-tabs/releases/latest)
 
-See the tabs that are open in **every VS Code window on your PC** and edit them from your phone, over your home or office Wi-Fi. Nothing goes through the internet. Notes look like Obsidian, you can type on the PC and the phone at the same time, and you can see who changed every line.
+See the tabs that are open in **every VS Code window on your PC** and edit them from your phone, over your home or office Wi-Fi. Nothing goes through the internet. Browse each window's folders and open files from the phone, type on the PC and the phone at the same time, and see who changed every line. Notes look like Obsidian.
 
 ## Screenshots
 
@@ -40,12 +40,17 @@ Click the phone icon in the status bar to get the QR code, then scan it to conne
 2. Click the **phone icon** in the VS Code status bar (bottom right), or run **Pocket Tabs: Show Phone QR Code** from the Command Palette.
 3. Scan the QR code with your phone camera. Your phone and PC must be on the same Wi-Fi.
 4. Tap a note to open it. Edits go to VS Code as you type, and you can keep typing on the PC at the same time. Tap **Save** to write the file to disk.
+5. To open a file that isn't open on the PC yet, switch to **Files** and tap it.
 
 Tip: on the phone, use *Add to Home Screen* so it opens like an app.
 
 ## What you get on the phone
 
 **A notes-first home screen.** The **Notes** view lists every Markdown file open in any VS Code window, grouped by window, with a short preview of each note. **All tabs** shows every tab, code files included. Unsaved files have a yellow dot, and "Open on PC" marks the tab that is in front on the PC.
+
+**Browse your folders and open files yourself.** The **Files** view shows the folders open in each VS Code window as a tree. Tap a folder to expand it, or type in the search box to find a file by name across all your windows. Tap a file and it opens as a real tab in VS Code on the PC, then straight in the editor on the phone. Files that are already open have an **Open** chip. `.git`, `node_modules` and anything in your `files.exclude` setting are hidden. Images and other files the phone can't edit open on the PC only. The ↻ button next to a window's name reloads its folders.
+
+**Close tabs from the phone.** Tap **×** on a row in **All tabs**, or **Close this tab on the PC** in the editor's ⋯ menu. A tab with unsaved changes isn't closed from the list. From the editor, you're asked to save it first, so VS Code never shows a "save changes?" prompt that nobody is there to answer.
 
 **Markdown that looks like Obsidian.** Notes open in **Live Preview**. Formatting is rendered, and the Markdown syntax appears only on the line you're editing. Supported:
 
@@ -96,7 +101,9 @@ Attribution is kept while the file is open in VS Code. Older history comes from 
 
 - The phone page asks for an access code. The QR code includes it, and after you scan it the phone stays signed in.
 - **Pocket Tabs: New Access Code** signs out every phone.
-- A phone can only read and edit files that are **currently open in a tab**. It can't browse your disk. Images in notes are served only if they are image files inside that window's workspace folders (or the note's own folder).
+- A phone can only read and edit files that are **open in a tab** on the PC. Opening a file from **Files** makes it a tab first, so you can always see on the PC what a phone has open.
+- **Files** only lists and opens what's inside the folders open in that VS Code window. Paths that climb out with `..`, folders with a look-alike name (`project-other` next to `project`) and backslash tricks are refused. The rest of your disk is never listed.
+- Images in notes are served only if they are image files inside that window's workspace folders (or the note's own folder).
 - Traffic is plain HTTP on your local network. Use it on networks you trust (home or office), not on public Wi-Fi.
 
 ## Troubleshooting
@@ -119,7 +126,7 @@ The phone editor is CodeMirror 6 with a custom Live Preview layer (`web/`), bund
 ```
 npm install
 npm run build      # bundle web/ -> media/editor.js
-npm test           # diff/merge tests, co-editing fuzz test (PC + two phones), blame tests
+npm test           # diff/merge tests, co-editing fuzz test (PC + two phones), blame tests, file browser path checks
 npm run package    # builds pocket-tabs-<version>.vsix (runs the build first)
 code --install-extension pocket-tabs-<version>.vsix
 ```
